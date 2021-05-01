@@ -1,31 +1,53 @@
 #include "analyseur.h"
+#include "handle_tcp.h"
+#include <pthread.h>
+#include <pcap/pcap.h>
+#include <unistd.h>
 
 int verbosite;
+/* total packet size */
+static long unsigned int total_size = 0;
+static long unsigned int total_size_thread = 0;
 
-/* Callback function used by pcap */
-void callback_ETHER(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char* packet) {
-    /* handle the ethernet header */
-    handle_ethernet(args,pkthdr,packet,verbosite);
+int check_net_bandwidth(void *ptr)
+{
+	struct pcap_pkthdr *p;
+	p = (struct pcap_pkthdr *)ptr;
+
+	/*
+	 * check total_size every 10 second
+	 */
+	while (1) {
+		sleep(10);
+	}
 }
 
 /* Main program function */
 int main(int argc, char **argv)
 {
 	int iflag = 0;
+	/* sflag for bpf filter */
+	int sflag = 0;
 	int vflag = 0;
 	int oflag = 0;
 	char *ivalue = NULL;
+	char *svalue = NULL;
 	char *vvalue = NULL;
 	char *ovalue = NULL;
 	int c;
+	pthread_t thread;
 
 	/* Verify which options are used */
-	while ((c = getopt (argc, argv, "i:v:o:")) != -1)
+	while ((c = getopt (argc, argv, "i:s:v:o:")) != -1)
     	switch (c)
       	{
 		case 'i':
 			iflag = 1;
 			ivalue = optarg;
+			break;
+		case 's':
+			sflag = 1;
+			svalue = optarg;
 			break;
 		case 'v':
 			vflag = 1;
@@ -39,6 +61,15 @@ int main(int argc, char **argv)
 		    if (optopt == 'i')
 		      fprintf (stderr, "Option -%c requires an argument.\n", optopt);
 		    else if (isprint (optopt))
+		      fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+		    else
+		      fprintf (stderr,
+		               "Unknown option character `\\x%x'.\n",
+		               optopt);
+
+			if (optopt == 'p')
+				fprintf(stderr, "Option -%c retuires an integer.\n", optopt);
+			else if (isprint (optopt))
 		      fprintf (stderr, "Unknown option `-%c'.\n", optopt);
 		    else
 		      fprintf (stderr,
@@ -87,6 +118,7 @@ int main(int argc, char **argv)
 	else {
 		dev = ivalue;
 	}
+
 	/* If we don't use the verbosity option, the default value is 3 */
 	if (!vflag){
 		verbosite = 3;
@@ -161,10 +193,24 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	
+	thread = pthread_create(&thread, NULL, check_net_bandwidth, (void *)args);
+
+	/* analyze with bpf */
+	if (svalue != NULL) {
+		char *filter_expr = svalue;
+		struct bpf_program filter;
+
+		pcap_compile(descr, &filter, filter_expr, 0, netp);
+		pcap_setfilter(descr, &filter);
+		pcap_loop(descr, 0, callback_ETHER, args);
+		fprintf(stdout,"\nFinished\n");
+
+		return 0;
+	}
+
+	/* analyze without bpf */
 	pcap_loop(descr,0,callback_ETHER,args);
 	fprintf(stdout,"\nFinished\n");
-
 
 	return 0;
 } 
