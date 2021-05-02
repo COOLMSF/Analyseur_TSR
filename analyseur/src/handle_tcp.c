@@ -9,19 +9,85 @@
 #include "handle_pop.h"
 #include "handle_imap.h"
 #include "appli.h"
+#include "csv.h"
+#include <string.h>
+#include <time.h>
+
+void write_csv(FILE *fp, struct csv_data csv)
+{
+	char buf[MAX_LINE];
+
+	sprintf(buf, "%s, %s, %s, %d, %d, %s, %d", \
+		csv.time, csv.dst_ip, csv.src_ip, csv.dst_port, csv.src_port, \
+		csv.protocol, csv.ip_ver);
+	fwrite(buf, strlen(buf), 1, fp);
+}
 
 /* Function handling tcp packets  */
 u_char* handle_TCP(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char* packet,int verbosite) {
     const struct tcphdr* tcp;
+	/* Why not iphdr? */
+	const struct ip* ip;
     u_int length = pkthdr->len;
 
+	/* write struct to file */
+	FILE *fp;
+	struct csv_data csv;
+
+	/*
+	 * We should write the field name when the program firstly runs
+	 */
+	if(access("data.csv", F_OK) != 0) {
+	}
+
+	/* append csv file */
+	fp = fopen("data.csv", "a+");
+
     /* jump past the ethernet and ip headers */
+	ip = (struct ip*)(packet + sizeof(struct ether_header));
     tcp = (struct tcphdr*)(packet + sizeof(struct ether_header) + sizeof(struct ip));
     length = length - sizeof(struct ether_header) - sizeof(struct ip);
     /* check that the remaining packet size is enough */
     if (length < sizeof(struct tcphdr)) {
         printf("\t\ttruncated tcp\n");
     }
+	
+	// save time
+	time_t raw_time;
+	struct tm *time_info;
+
+	time(&raw_time);
+	time_info = localtime(&raw_time);
+	strcpy(csv.time, asctime(time_info));
+
+	// save ip
+	strcpy(csv.src_ip, inet_ntoa(ip->ip_src));
+	strcpy(csv.dst_ip, inet_ntoa(ip->ip_dst));
+
+	// save protocol
+    if(ip->ip_p == 0x06){
+        strcpy(csv.protocol, "TCP");
+    }
+    else if(ip->ip_p == 0x11){
+		strcpy(csv.protocol, "UDP");
+    }
+    else if(ip->ip_p == 0x01){
+		strcpy(csv.protocol, "ICMP");
+    }
+    else if(ip->ip_p == 0x02){
+		strcpy(csv.protocol, "IGMP");
+    }
+
+	// save ip version
+	csv.ver = ip->ip_v;
+
+	// save port
+	csv.src_port = tcp->th_sport;
+	csv.dst_port = tcp->th_dport;
+
+	// write to file
+	write_csv(fp, csv);
+	fclose(fp);
 
     /* Depending on the verbosity we print the packet differently */
     switch (verbosite)
