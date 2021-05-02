@@ -3,12 +3,12 @@ TARGET   = analyseur
 
 CC       = gcc
 # compiling flags here
-CFLAGS   =-Wall
+CFLAGS   =-Wall -g
 
 LINKER   = gcc -o
 # linking flags here
 LFLAGS   = 
-LDFLAGS  =-lpcap -g #Linker
+LDFLAGS  =-lpcap -lpthread -g #Linker
 
 # change these to set the proper directories where each files should be
 SRCDIR   = src

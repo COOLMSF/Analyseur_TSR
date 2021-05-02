@@ -5,9 +5,21 @@
 #include <unistd.h>
 
 int verbosite;
-/* total packet size */
+/* Global variable
+ * This is critical region use in careful
+ */
 static long unsigned int total_size = 0;
 static long unsigned int total_size_thread = 0;
+
+/* Callback function used by pcap */
+void callback_ETHER(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char* packet)
+{
+	/* Should these variable be locked? */
+	total_size += pkthdr->len;
+	total_size_thread += pkthdr->len;
+    /* handle the ethernet header */
+    handle_ethernet(args,pkthdr,packet,verbosite);
+}
 
 int check_net_bandwidth(void *ptr)
 {
@@ -18,7 +30,18 @@ int check_net_bandwidth(void *ptr)
 	 * check total_size every 10 second
 	 */
 	while (1) {
+		long unsigned int rate = total_size_thread / 10;
 		sleep(10);
+		if (rate <= 1000) {
+			printf("Bandwidth:%ldB/s\n", rate);
+		} else {
+			printf("Bandwidth:%ldKB/s\n", rate / 1000);
+		}
+		/* 
+		 * reset tital_size_thread after use, this variable just stores
+		 * the total traffic of 10 seconds
+		 */
+		total_size_thread = 0;
 	}
 }
 
