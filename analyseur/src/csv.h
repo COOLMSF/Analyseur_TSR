@@ -1,4 +1,4 @@
-#define MAX_LINE 50
+#define MAX_LINE 1024
 struct csv_data {
 	char time[MAX_LINE];
 	char dst_ip[MAX_LINE];

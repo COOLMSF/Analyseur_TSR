@@ -79,7 +79,7 @@ u_char* handle_TCP(u_char *args,const struct pcap_pkthdr* pkthdr,const u_char* p
     }
 
 	// save ip version
-	csv.ver = ip->ip_v;
+	csv.ip_ver = ip->ip_v;
 
 	// save port
 	csv.src_port = tcp->th_sport;
